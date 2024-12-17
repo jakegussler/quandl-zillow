@@ -1,0 +1,12 @@
+zillow_analytics:
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: zillow_user
+      password: zillow_password
+      dbname: zillow_analytics
+      schema: public
+      threads: 4
+  target: dev
