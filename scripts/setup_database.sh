@@ -4,6 +4,7 @@
 ENV_FILE="${1:-../.env}"
 
 if [ -f "$ENV_FILE" ]; then
+#    echo "Retrieving variables from $ENV_FILE"
     source "$ENV_FILE"
 else
     echo ".env file not found in $ENV_FILE, exiting"
@@ -18,10 +19,10 @@ POSTGRES_SUPERUSER_PASSWORD=${POSTGRES_SUPERUSER_PASSWORD}
 
 export PGPASSWORD="$POSTGRES_SUPERUSER_PASSWORD"
 
-echo "$DB_NAME"
-echo "$DB_USER"
-echo "$DB_PASSWORD"
-echo "$POSTGRES_SUPERUSER_PASSWORD"
+#echo "$DB_NAME"
+#echo "$DB_USER"
+#echo "$DB_PASSWORD"
+#echo "$POSTGRES_SUPERUSER_PASSWORD"
 
 #Connect to postgres as super user and run commands
 psql -U postgres -h localhost -w <<EOF
