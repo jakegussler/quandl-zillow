@@ -4,11 +4,11 @@
 ENV_FILE="${1:-../.env}"
 
 if [ -f "$ENV_FILE" ]; then
-#    echo "Retrieving variables from $ENV_FILE"
+    echo "Retrieving variables from $ENV_FILE"
     source "$ENV_FILE"
 else
     echo ".env file not found in $ENV_FILE, exiting"
-    return 1
+    exit 1
 fi
 
 #Set environment variables
@@ -25,7 +25,7 @@ export PGPASSWORD="$POSTGRES_SUPERUSER_PASSWORD"
 #echo "$POSTGRES_SUPERUSER_PASSWORD"
 
 #Connect to postgres as super user and run commands
-psql -U postgres -h localhost -w <<EOF
+psql -U postgres -h localhost <<EOF
 
 --Drop database if exists
 DROP DATABASE IF EXISTS $DB_NAME;
@@ -39,7 +39,7 @@ DROP USER IF EXISTS $DB_USER;
 --Create user
 CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';
 
---Grant priviliges to user
+--Grant privileges to user
 GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
 EOF
 
