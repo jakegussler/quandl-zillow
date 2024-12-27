@@ -1,3 +1,8 @@
+
+## Not currently being used
+## Likely delete, just keeping for connection info reference
+##
+
 import psycopg2
 from psycopg2 import sql
 
