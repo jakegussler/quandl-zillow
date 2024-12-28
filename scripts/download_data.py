@@ -4,12 +4,13 @@ import os
 import pandas as pd
 import logging
 from sqlalchemy import create_engine
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def paginated_getter(url):
+def paginated_getter(url, max_retries=5, retry_delay=5):
 
     #Data chunk for keeping track of the number of data chunks, not passed into API
     page_number = 0
@@ -27,13 +28,29 @@ def paginated_getter(url):
             #Log statement to keep track of the data chunk
             page_number+=1
             logger.info(f"Getting data chunk {page_number}")
-            
-            #Make the request to the API
-            response = requests.get(url, params=url_parameters)
-            
-            #Check if the request was successful
-            response.raise_for_status()
-            
+            for attempt in range(max_retries):
+                try:
+                    #Make the request to the API
+                    response = requests.get(url, params=url_parameters)
+                    response.raise_for_status() #Raise an error for bad HTTP responses
+                    #Exit attempt loop if successful
+                    if response.status_code == 200:
+                        break
+               
+                except requests.exceptions.RequestException as e:
+                    logger.info(f'Attempt {attempt + 1} of {max_retries} failed: {str(e)}')
+                    if attempt < max_retries:
+                        logger.info(f"Retrying in {retry_delay} seconds...")
+                        
+                        #Exponential backoff
+                        if attempt > 0:
+                            retry_delay = round(retry_delay * 1.5, 0)
+                        
+                        #Wait for the retry delay
+                        time.sleep(retry_delay)
+                    else:
+                        print("Max retries reached. Returning None")
+
             #Convert the response to a json
             json_response = response.json()
             
@@ -73,7 +90,7 @@ def process_response(json_response, max_retries=3):
         try:
             #Extract the data and columns from the json response
             data = json_response["datatable"]["data"]
-            columns = (col["name"] for col in json_response["datatable"]["columns"])
+            columns = [col["name"] for col in json_response["datatable"]["columns"]]
             
             #Create a dataframe from the data and columns
             df = pd.DataFrame(data, columns=columns)
@@ -86,8 +103,12 @@ def process_response(json_response, max_retries=3):
 
 
 def ingest_df_to_postgres(df, table_name, engine):
+    chunksize = 10000
+    schema = 'raw'
+    
     try:
-        df.to_sql(table_name, engine, if_exists='replace', index=False)
+        #Ingest the data into the database
+        df.to_sql(table_name.lower(), engine, if_exists='replace', schema=schema, index=False, chunksize=chunksize)
         logger.info(f"Data successfully ingested into {table_name}")
     except Exception as e:
         logger.error(f"An error occured while ingesting data into {table_name}: {str(e)}")
@@ -100,7 +121,7 @@ def download_zillow_tables():
 
 
     # Database connection
-    engine = create_engine(f'{db_config["db_type"]}://{db_config["user"]}:{db_config["password"]}@{db_config["host"]}:{db_config["port"]}/{db_config["database"]}')
+    engine = create_engine(f'{db_config["type"]}://{db_config["user"]}:{db_config["password"]}@{db_config["host"]}:{db_config["port"]}/{db_config["database"]}')
 
     #Iterate through the tables
     for table in tables:
@@ -108,11 +129,11 @@ def download_zillow_tables():
 
         #Get the data from the API
         logger.info(f"Downloading data from {url}")
-        df = paginated_getter(url)
-        logger.info(f"Total rows downloaded from {table}: {df.shape[0]}")
+        final_df = paginated_getter(url)
+        logger.info(f"Total rows downloaded from {table}: {len(final_df)}")
 
         #Ingest the data into the database
-        ingest_df_to_postgres(df, table, engine)
+        ingest_df_to_postgres(final_df, table, engine)
 
 
 
@@ -123,13 +144,14 @@ if __name__ == "__main__":
     load_dotenv()
     
     db_config = {
-        'db_type': os.getenv('DB_TYPE', 'postgresql'),
-        'user':os.getenv('POSTGRES_USER'),
-        'password':os.getenv('POSTGRES_PASSWORD'),
-        'host':'localhost',
-        'port':'5432',
-        'database':os.getenv('POSTGRES_DATABASE')
+        'type': os.getenv('DB_TYPE', 'postgresql'),
+        'user':os.getenv('DB_USER', 'zillow_user'),
+        'password':os.getenv('DB_PASSWORD', 'zillow_password'),
+        'host':os.getenv('DB_HOST', 'localhost'),
+        'port':os.getenv('DB_PORT', '5432'),
+        'database':os.getenv('DB_NAME', 'zillow_analytics')
     }
+    print(f'DB_CONFIG: {db_config}')
 
 
     #Download the zillow tables
