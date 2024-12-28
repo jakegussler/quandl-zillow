@@ -15,6 +15,7 @@ dbt-adapters==1.10.4
 dbt-common==1.14.0
 dbt-core==1.9.0
 dbt-extractor==0.5.1
+dbt-postgres==1.9.0
 dbt-semantic-interfaces==0.7.4
 dbt-snowflake==1.9.0
 deepdiff==7.0.1
@@ -44,12 +45,14 @@ parsedatetime==2.6
 pathspec==0.12.1
 platformdirs==4.3.6
 protobuf==5.29.1
+psycopg2-binary==2.9.10
 pycparser==2.22
 pydantic==2.10.3
 pydantic_core==2.27.1
 PyJWT==2.10.1
 pyOpenSSL==24.3.0
 python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
 python-slugify==8.0.4
 pytimeparse==1.1.8
 pytz==2024.2
