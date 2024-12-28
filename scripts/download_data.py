@@ -97,12 +97,10 @@ def download_zillow_tables():
 
     base_url =  "https://data.nasdaq.com/api/v3/datatables/ZILLOW/"
     tables = ['DATA', 'INDICATORS', 'REGIONS']
-    zillow_user = os.getenv('ZILLOW_USER')
-    zillow_password = os.getenv('ZILLOW_PASSWORD')
-    db_name =  os.getenv('POSTGRES_DATABASE')
+
 
     # Database connection
-    engine = create_engine(f'postgresql://{zillow_user}:{zillow_password}@localhost:5432/{db_name}')
+    engine = create_engine(f'{db_config["db_type"]}://{db_config["user"]}:{db_config["password"]}@{db_config["host"]}:{db_config["port"]}/{db_config["database"]}')
 
     #Iterate through the tables
     for table in tables:
@@ -123,6 +121,16 @@ def download_zillow_tables():
 if __name__ == "__main__":
     #Load the environment variables
     load_dotenv()
+    
+    db_config = {
+        'db_type': os.getenv('DB_TYPE', 'postgresql'),
+        'user':os.getenv('POSTGRES_USER'),
+        'password':os.getenv('POSTGRES_PASSWORD'),
+        'host':'localhost',
+        'port':'5432',
+        'database':os.getenv('POSTGRES_DATABASE')
+    }
+
 
     #Download the zillow tables
     download_zillow_tables()
