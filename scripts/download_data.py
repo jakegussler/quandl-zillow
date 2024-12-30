@@ -14,24 +14,35 @@ def paginated_getter(url, max_retries=5, retry_delay=5):
 
     #Data chunk for keeping track of the number of data chunks, not passed into API
     page_number = 0
-    
-    #Initialise an empty list to store all the dataframes
-    all_dfs = []
-    
+
     #Parameters to be passed to the API
     url_parameters = {
         'api_key':os.getenv('QUANDL_API_KEY'),
     }
+    
+    table_name = url.split('/')[-1].lower()
+
+    #Initial retry delay
+    initial_retry_delay = retry_delay
+
+    #Database connection
+    engine = create_engine(f'{db_config["type"]}://{db_config["user"]}:{db_config["password"]}@{db_config["host"]}:{db_config["port"]}/{db_config["database"]}')
+
     try:
         while(True):
-            
+   
             #Log statement to keep track of the data chunk
             page_number+=1
             logger.info(f"Getting data chunk {page_number}")
+
+            #Start time for the request
+            start_time = time.time()
+
+            #Retry loop
             for attempt in range(max_retries):
                 try:
                     #Make the request to the API
-                    response = requests.get(url, params=url_parameters)
+                    response = requests.get(url, params=url_parameters, timeout=10)
                     response.raise_for_status() #Raise an error for bad HTTP responses
                     #Exit attempt loop if successful
                     if response.status_code == 200:
@@ -61,27 +72,29 @@ def paginated_getter(url, max_retries=5, retry_delay=5):
             #Process the response
             df = process_response(json_response)
             
-            #Append the dataframe to the list
-            all_dfs.append(df)
+            #Ingest the dataframe into the database
+            ingest_df_to_postgres(df, table_name, engine)
             
+            #Reset the retry delay
+            retry_delay = initial_retry_delay
+            
+            #End time for the request
+            end_time = time.time()
+
+            #Log the time taken to retrieve the data chunk
+            logger.info(f"Data chunk {page_number} successfully retrieved in {end_time-start_time} seconds")
+                        
             #Check if there is a next cursor id
             if not json_response["meta"]["next_cursor_id"]:
                 break
             else:
                 #Add/Update the cursor id in the URL parameters
                 url_parameters['qopts.cursor_id'] = json_response["meta"]["next_cursor_id"]
+
     except requests.exceptions.HTTPError as e:
         logger.error(f"An error occured at page {page_number}: {str(e)}")
         raise
-    finally:
-        if all_dfs:
-            logger.info(f"Total pages of data retrieved: {len(all_dfs)}")
-            logger.info("Combining all data into a single dataframe...")
-            final_df = pd.concat(all_dfs, ignore_index=True)
-            return final_df
-        else:
-            logger.error("No data was retrieved")
-            return None
+
 
 
 def process_response(json_response, max_retries=3):
@@ -90,7 +103,7 @@ def process_response(json_response, max_retries=3):
         try:
             #Extract the data and columns from the json response
             data = json_response["datatable"]["data"]
-            columns = [col["name"] for col in json_response["datatable"]["columns"]]
+            columns = [col["name"].lower() for col in json_response["datatable"]["columns"]]
             
             #Create a dataframe from the data and columns
             df = pd.DataFrame(data, columns=columns)
@@ -103,12 +116,11 @@ def process_response(json_response, max_retries=3):
 
 
 def ingest_df_to_postgres(df, table_name, engine):
-    chunksize = 10000
-    schema = 'raw'
     
+    schema = 'raw'
     try:
         #Ingest the data into the database
-        df.to_sql(table_name.lower(), engine, if_exists='replace', schema=schema, index=False, chunksize=chunksize)
+        df.to_sql(table_name, engine, if_exists='append', schema=schema, index=False)
         logger.info(f"Data successfully ingested into {table_name}")
     except Exception as e:
         logger.error(f"An error occured while ingesting data into {table_name}: {str(e)}")
@@ -120,20 +132,14 @@ def download_zillow_tables():
     tables = ['DATA', 'INDICATORS', 'REGIONS']
 
 
-    # Database connection
-    engine = create_engine(f'{db_config["type"]}://{db_config["user"]}:{db_config["password"]}@{db_config["host"]}:{db_config["port"]}/{db_config["database"]}')
-
     #Iterate through the tables
     for table in tables:
         url = base_url + table
 
         #Get the data from the API
         logger.info(f"Downloading data from {url}")
-        final_df = paginated_getter(url)
-        logger.info(f"Total rows downloaded from {table}: {len(final_df)}")
+        paginated_getter(url)
 
-        #Ingest the data into the database
-        ingest_df_to_postgres(final_df, table, engine)
 
 
 
@@ -142,17 +148,6 @@ def download_zillow_tables():
 if __name__ == "__main__":
     #Load the environment variables
     load_dotenv()
-    
-    db_config = {
-        'type': os.getenv('DB_TYPE', 'postgresql'),
-        'user':os.getenv('DB_USER', 'zillow_user'),
-        'password':os.getenv('DB_PASSWORD', 'zillow_password'),
-        'host':os.getenv('DB_HOST', 'localhost'),
-        'port':os.getenv('DB_PORT', '5432'),
-        'database':os.getenv('DB_NAME', 'zillow_analytics')
-    }
-    print(f'DB_CONFIG: {db_config}')
-
 
     #Download the zillow tables
     download_zillow_tables()
