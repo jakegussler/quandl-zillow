@@ -148,6 +148,17 @@ def download_zillow_tables():
 if __name__ == "__main__":
     #Load the environment variables
     load_dotenv()
+    
+    db_config = {
+        'type': os.getenv('DB_TYPE', 'postgresql'),
+        'user':os.getenv('DB_USER', 'zillow_user'),
+        'password':os.getenv('DB_PASSWORD', 'zillow_password'),
+        'host':os.getenv('DB_HOST', 'localhost'),
+        'port':os.getenv('DB_PORT', '5432'),
+        'database':os.getenv('DB_NAME', 'zillow_analytics')
+    }
+    print(f'DB_CONFIG: {db_config}')
+
 
     #Download the zillow tables
     download_zillow_tables()
