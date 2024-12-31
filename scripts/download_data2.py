@@ -7,23 +7,26 @@ from sqlalchemy import create_engine
 import datetime
 import time
 import gc
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
-from IPython.display import clear_output
+
+from IPython.display import display, HTML
+import plotly.graph_objects as go
+import plotly.io as pio
+pio.renderers.default = 'browser'
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def paginated_getter(url, max_retries=10, retry_delay=5):
+def paginated_getter(url, max_retries=10, retry_delay=5, timeout=30):
 
     #Data chunk for keeping track of the number of data chunks, not passed into API
     page_number = 0
     
-    #Performance data
+    #Performance data for monitoring the API
     page_numbers = []
-    kb_per_seconds = []
+    kb_values = []
+    kb_per_second_values = []
 
 
 
@@ -42,14 +45,30 @@ def paginated_getter(url, max_retries=10, retry_delay=5):
 
     s = requests.session()
 
-    #Create plot for performance metrics
-    plt.ion()
-    fig, ax = plt.subplots(figsize=(10, 6))
-    line = ax.plot(page_numbers, kb_per_seconds, label='kb/s')[0]  
-    ax.set_xlabel('Page Number')
-    ax.set_ylabel('KB/s')
-    ax.set_title('API Performance Monitor')
-    plt.grid(True) 
+    # Create the initial figures
+    fig_performance = go.Figure()
+    fig_performance.update_layout(
+        title=f'API Performance Monitor {table_name}',
+        xaxis_title='Page Number',
+        yaxis_title='KB/s',
+        showlegend=False
+    )
+
+    fig_response_size = go.Figure()
+    fig_response_size.update_layout(
+        title=f'API Response Size Monitor {table_name}',
+        xaxis_title='Page Number',
+        yaxis_title='KB',
+        showlegend=False
+    )
+
+    # Create HTML files for the plots
+    fig_performance_html_file = 'performance_plot.html'
+    fig_performance.write_html(fig_performance_html_file, auto_open=True)
+
+    fig_response_size_html_file = 'response_size_plot.html'
+    fig_response_size.write_html(fig_response_size_html_file, auto_open=True)
+    
 
 
     try:
@@ -66,7 +85,7 @@ def paginated_getter(url, max_retries=10, retry_delay=5):
             for attempt in range(max_retries):
                 try:
                     #Make the request to the API
-                    response = s.get(url, params=url_parameters, timeout=10)
+                    response = s.get(url, params=url_parameters, timeout=timeout)
                     response.raise_for_status() #Raise an error for bad HTTP responses
                     #Exit attempt loop if successful
                     if response.status_code == 200:
@@ -113,19 +132,28 @@ def paginated_getter(url, max_retries=10, retry_delay=5):
 
             #Update the pefformance data lists
             page_numbers.append(page_number)
-            kb_per_seconds.append(kb_per_second)
+            kb_values.append(response_size_kb)
+            kb_per_second_values.append(kb_per_second)
 
-            #Update the plot
-            line.set_xdata(page_numbers)
-            line.set_ydata(kb_per_seconds)
-
-            #Update the plot limits
-            ax.relim()
-            ax.autoscale_view()
-
-            #Draw the updated plot
-            fig.canvas.draw()
-            fig.canvas.flush_events()
+            # Create and show the updated plot
+            fig_performance = go.Figure()
+            fig_performance.add_trace(go.Scatter(
+                x=page_numbers, 
+                y=kb_per_second_values, 
+                mode='lines+markers'
+            ))
+            fig_response_size = go.Figure()
+            fig_response_size.add_trace(go.Scatter(
+                x=page_numbers,
+                y=kb_values,
+                mode='lines+markers'
+            ))
+   
+            
+            # Update the plot HTML files
+            fig_performance.write_html(fig_performance_html_file, auto_open=False)
+            fig_response_size.write_html(fig_response_size_html_file, auto_open=False)
+            
 
             #Log the time taken to retrieve the data chunk
             logger.info(f"Request time: {request_end_time-start_time} seconds")
@@ -150,8 +178,6 @@ def paginated_getter(url, max_retries=10, retry_delay=5):
                 
                 gc.collect()
 
-                #Wait for a second before making the next request
-                time.sleep(2)
 
     
 
