@@ -139,7 +139,7 @@ def paginated_getter(url, max_retries=10, retry_delay=5, timeout=30):
             fig_performance = go.Figure()
             fig_performance.add_trace(go.Scatter(
                 x=page_numbers, 
-                y=kb_per_second_values, 
+                y=kb_per_second_values,
                 mode='lines+markers'
             ))
             fig_response_size = go.Figure()
