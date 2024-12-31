@@ -148,6 +148,8 @@ def paginated_getter(url, max_retries=10, retry_delay=5, timeout=30):
                 y=kb_values,
                 mode='lines+markers'
             ))
+
+            plot_end_time = datetime.datetime.now()
    
             
             # Update the plot HTML files
@@ -157,7 +159,9 @@ def paginated_getter(url, max_retries=10, retry_delay=5, timeout=30):
 
             #Log the time taken to retrieve the data chunk
             logger.info(f"Request time: {request_end_time-start_time} seconds")
-            logger.info(f"{page_number} total time: {ingest_end_time-start_time} seconds")
+            logger.info(f"Processing time: {ingest_end_time-request_end_time} seconds")
+            logger.info(f"Plotting time: {plot_end_time-ingest_end_time} seconds")
+            logger.info(f"Page {page_number} total time: {ingest_end_time-start_time} seconds")
             logger.info(f"Response size in KB: {response_size_kb} KB")
             logger.info(f"Response kb/s: {kb_per_second} KB/s\n")
 
