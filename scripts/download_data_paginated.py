@@ -171,14 +171,9 @@ def download_zillow_tables():
         paginated_getter(url)
 
 
-
-
-
-
-if __name__ == "__main__":
+def main() -> None:
     #Load the environment variables
     load_dotenv()
-    
 
     db_config = {
         'type': os.getenv('DB_TYPE', 'postgresql'),
@@ -190,7 +185,11 @@ if __name__ == "__main__":
     }
 
 
+    
     #Download the zillow tables
     download_zillow_tables()
+
+if __name__ == "__main__":
+    main()
 
     

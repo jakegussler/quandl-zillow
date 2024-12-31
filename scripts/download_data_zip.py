@@ -17,7 +17,7 @@ import gc
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-data_filepath = "/Users/jakegussler/Projects/quandl-zillow/data"
+data_filepath = "/Users/jakegussler/Projects/quandl-zillow/data/raw"
 
 
 def get_nasdaq_data(database_code, dataset_code, max_retries=10, retry_delay=5):
@@ -57,13 +57,15 @@ def download_zillow_tables():
         #Get the data from the API
         get_nasdaq_data(database_code, dataset_code)
 
-
-if __name__ == "__main__":
-    
+def main() -> None:
     #Load the environment variables
     load_dotenv()
     
     #Download the zillow tables
     download_zillow_tables()
+
+if __name__ == "__main__":
+    main()
+
 
     
