@@ -2,16 +2,16 @@ import requests
 from dotenv import load_dotenv
 import os
 import pandas as pd
-import logging
+from logger_config import setup_logging
 from sqlalchemy import create_engine
 import datetime
 import time
 import gc
 from database import get_engine
-from config import API_CONFIG
+from config import DB_CONFIG, API_CONFIG
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+logger = setup_logging()
 
 
 def paginated_getter(url):
@@ -156,6 +156,8 @@ def download_zillow_tables():
 def main() -> None:
     #Load the environment variables
     load_dotenv()
+
+
 
     #Download the zillow tables
     download_zillow_tables()
