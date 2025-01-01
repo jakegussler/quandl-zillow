@@ -2,131 +2,113 @@ import requests
 from dotenv import load_dotenv
 import os
 import pandas as pd
-import logging
+from logger_config import setup_logging
 from sqlalchemy import create_engine
 import datetime
 import time
 import gc
+from database import get_engine
+from config import DB_CONFIG, API_CONFIG
 
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = setup_logging()
 
 
-def paginated_getter(url, max_retries=10, retry_delay=5, timeout=30):
+def paginated_getter(url):
 
     #Data chunk for keeping track of the number of data chunks, not passed into API
     page_number = 0
-    
 
-
-    #Parameters to be passed to the API
-    url_parameters = {
-        'api_key':os.getenv('QUANDL_API_KEY'),
-    }
-    
     table_name = url.split('/')[-1].lower()
+
+    #Database connection
+    engine = get_engine()
+
+    with requests.session() as s:
+        try:
+            while(True):
+    
+                page_number+=1
+                logger.info(f"Getting data chunk {page_number}---------------------------------")
+
+                #Start time for the request
+                start_time = datetime.datetime.now()
+
+                response = get_response(url, API_CONFIG, s)
+
+                json_response = response.json()
+
+                request_end_time = datetime.datetime.now()
+
+                df = process_response(json_response)
+                if df is None:
+                    logger.error(f"Failed to process data chunk {page_number}")
+                    continue
+                
+                ingest_df_to_postgres(df, table_name, engine)
+
+                logger.info(f"Data chunk {page_number} successfully ingested\n")
+
+                ingest_end_time = datetime.datetime.now()
+
+                log_processing_times(response, start_time, request_end_time, ingest_end_time, page_number)
+                            
+                #Check if there is a next cursor id
+                if not json_response["meta"]["next_cursor_id"]:
+                    break
+                else:
+                    #Add/Update the cursor id in the API config
+                    API_CONFIG['qopts.cursor_id'] = json_response["meta"]["next_cursor_id"]
+                    
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"An error occured at page {page_number}: {str(e)}")
+            raise
+
+def log_processing_times(response, start_time, request_end_time, ingest_end_time, page_number):
+
+    #Calculate the performance metrics
+    response_size_kb = len(response.content)/1024
+    kb_per_second = response_size_kb/(ingest_end_time-start_time).total_seconds()
+
+    #Log the time taken to retrieve the data chunk
+    logger.info(f"Request time: {request_end_time-start_time} seconds")
+    logger.info(f"Processing time: {ingest_end_time-request_end_time} seconds")
+    logger.info(f"{page_number} total time: {ingest_end_time-start_time} seconds")
+    logger.info(f"Response size in KB: {response_size_kb} KB")
+    logger.info(f"Response kb/s: {kb_per_second} KB/s\n")
+
+
+def get_response(url, url_parameters,  request_session, max_retries=10, retry_delay=5, timeout=30):
 
     #Initial retry delay
     initial_retry_delay = retry_delay
 
-    #Database connection
-    engine = create_engine(f'{db_config["type"]}://{db_config["user"]}:{db_config["password"]}@{db_config["host"]}:{db_config["port"]}/{db_config["database"]}')
-
-    s = requests.session()
-
-    try:
-        while(True):
-   
-            #Log statement to keep track of the data chunk
-            page_number+=1
-            logger.info(f"Getting data chunk {page_number}---------------------------------")
-
-            #Start time for the request
-            start_time = datetime.datetime.now()
-
-            #Retry loop
-            for attempt in range(max_retries):
-                try:
-                    #Make the request to the API
-                    response = s.get(url, params=url_parameters, timeout=timeout)
-                    response.raise_for_status() #Raise an error for bad HTTP responses
-                    #Exit attempt loop if successful
-                    if response.status_code == 200:
-                        break
-               
-                except requests.exceptions.RequestException as e:
-                    logger.info(f'Attempt {attempt + 1} of {max_retries} failed: {str(e)}')
-                    if attempt < max_retries:
-                        logger.info(f"Retrying in {retry_delay} seconds...")
-                        
-                        #Exponential backoff
-                        if attempt > 0:
-                            retry_delay = round(retry_delay * 1.5, 0)
-                        
-                        #Wait for the retry delay
-                        time.sleep(retry_delay)
-                    else:
-                        print("Max retries reached. Returning None")
-
-            #Convert the response to a json
-            json_response = response.json()
-            
-            #Check if the response is empty
-            if not json_response["datatable"]["data"]:
-                break
-            
-            #Log the time taken to retrieve the data chunk
-            request_end_time = datetime.datetime.now()
-            
-
-            #Process the response
-            df = process_response(json_response)
-            
-            #Ingest the dataframe into the database
-            ingest_df_to_postgres(df, table_name, engine)
-
-            logger.info(f"Data chunk {page_number} successfully ingested\n")
-
-            ingest_end_time = datetime.datetime.now()
-
-            #Calculate the performance metrics
-            response_size_kb = len(response.content)/1024
-            kb_per_second = response_size_kb/(ingest_end_time-start_time).total_seconds()
-
-
-            #Log the time taken to retrieve the data chunk
-            logger.info(f"Request time: {request_end_time-start_time} seconds")
-            logger.info(f"Processing time: {ingest_end_time-request_end_time} seconds")
-            logger.info(f"{page_number} total time: {ingest_end_time-start_time} seconds")
-            logger.info(f"Response size in KB: {response_size_kb} KB")
-            logger.info(f"Response kb/s: {kb_per_second} KB/s\n")
-
-
-            #Reset the retry delay
-            retry_delay = initial_retry_delay
-            
-            #Clean up the dataframe
-            del df
-                        
-            #Check if there is a next cursor id
-            if not json_response["meta"]["next_cursor_id"]:
-                gc.collect()
-                break
-            else:
-                #Add/Update the cursor id in the URL parameters
-                url_parameters['qopts.cursor_id'] = json_response["meta"]["next_cursor_id"]
+    #Retry loop
+    for attempt in range(max_retries):
+        try:
+            #Make the request to the API
+            response = request_session.get(url, params=url_parameters, timeout=timeout)
+            response.raise_for_status() #Raise an error for bad HTTP responses
+            #Exit attempt loop if successful
+            if response.status_code == 200:
+                #Reset the retry delay
+                retry_delay = initial_retry_delay
+                return response
+        
+        except requests.exceptions.RequestException as e:
+            logger.info(f'Attempt {attempt + 1} of {max_retries} failed: {str(e)}')
+            if attempt < max_retries:
+                logger.info(f"Retrying in {retry_delay} seconds...")
                 
-                gc.collect()
-
-
-    
-
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"An error occured at page {page_number}: {str(e)}")
-        raise
-
-
+                #Exponential backoff
+                if attempt > 0:
+                    retry_delay = round(retry_delay * 1.5, 0)
+                
+                #Wait for the retry delay
+                time.sleep(retry_delay)
+            else:
+                print("Max retries reached. Returning None")
+                return None
 
 def process_response(json_response, max_retries=3):
     
@@ -159,7 +141,7 @@ def ingest_df_to_postgres(df, table_name, engine):
 def download_zillow_tables():
 
     base_url =  "https://data.nasdaq.com/api/v3/datatables/ZILLOW/"
-    tables = ['DATA', 'INDICATORS', 'REGIONS']
+    tables = [ 'INDICATORS', 'REGIONS', 'DATA' ]
 
 
     #Iterate through the tables
@@ -175,17 +157,8 @@ def main() -> None:
     #Load the environment variables
     load_dotenv()
 
-    db_config = {
-        'type': os.getenv('DB_TYPE', 'postgresql'),
-        'user':os.getenv('DB_USER', 'zillow_user'),
-        'password':os.getenv('DB_PASSWORD', 'zillow_password'),
-        'host':os.getenv('DB_HOST', 'localhost'),
-        'port':os.getenv('DB_PORT', '5432'),
-        'database':os.getenv('DB_NAME', 'zillow_analytics')
-    }
 
 
-    
     #Download the zillow tables
     download_zillow_tables()
 
