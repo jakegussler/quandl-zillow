@@ -24,43 +24,45 @@ def paginated_getter(url):
     #Database connection
     engine = get_engine()
 
-    s = requests.session()
+    with requests.session() as s:
+        try:
+            while(True):
+    
+                page_number+=1
+                logger.info(f"Getting data chunk {page_number}---------------------------------")
 
-    try:
-        while(True):
-   
-            page_number+=1
-            logger.info(f"Getting data chunk {page_number}---------------------------------")
+                #Start time for the request
+                start_time = datetime.datetime.now()
 
-            #Start time for the request
-            start_time = datetime.datetime.now()
+                response = get_response(url, API_CONFIG, s)
 
-            response = get_response(url, API_CONFIG, s)
+                json_response = response.json()
 
-            json_response = response.json()
+                request_end_time = datetime.datetime.now()
 
-            request_end_time = datetime.datetime.now()
-
-            df = process_response(json_response)
-            
-            ingest_df_to_postgres(df, table_name, engine)
-
-            logger.info(f"Data chunk {page_number} successfully ingested\n")
-
-            ingest_end_time = datetime.datetime.now()
-
-            log_processing_times(response, start_time, request_end_time, ingest_end_time, page_number)
-                        
-            #Check if there is a next cursor id
-            if not json_response["meta"]["next_cursor_id"]:
-                break
-            else:
-                #Add/Update the cursor id in the API config
-                API_CONFIG['qopts.cursor_id'] = json_response["meta"]["next_cursor_id"]
+                df = process_response(json_response)
+                if df is None:
+                    logger.error(f"Failed to process data chunk {page_number}")
+                    continue
                 
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"An error occured at page {page_number}: {str(e)}")
-        raise
+                ingest_df_to_postgres(df, table_name, engine)
+
+                logger.info(f"Data chunk {page_number} successfully ingested\n")
+
+                ingest_end_time = datetime.datetime.now()
+
+                log_processing_times(response, start_time, request_end_time, ingest_end_time, page_number)
+                            
+                #Check if there is a next cursor id
+                if not json_response["meta"]["next_cursor_id"]:
+                    break
+                else:
+                    #Add/Update the cursor id in the API config
+                    API_CONFIG['qopts.cursor_id'] = json_response["meta"]["next_cursor_id"]
+                    
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"An error occured at page {page_number}: {str(e)}")
+            raise
 
 def log_processing_times(response, start_time, request_end_time, ingest_end_time, page_number):
 
