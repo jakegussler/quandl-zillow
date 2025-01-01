@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 import datetime
 import time
 import gc
+from config import API_CONFIG
 
 ###This version of download_data uses the NASDAQ Data Link library to download the entire 
 ###Zillow dataset from the NASDAQ Data Link API as a CSV file.
@@ -25,7 +26,7 @@ def get_nasdaq_data(database_code, dataset_code, max_retries=10, retry_delay=5):
     logger.info(f"Downloading {database_code}_{dataset_code}.zip...")
 
     #Set the API Key
-    ndl.ApiConfig.api_key = os.getenv('NASDAQ_DATA_LINK_API_KEY')
+    ndl.ApiConfig.api_key = API_CONFIG['api_key']
     
     data_code = f"{database_code}/{dataset_code}"
     filename = f"{data_filepath}/{database_code}_{dataset_code}.zip"
