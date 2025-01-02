@@ -2,8 +2,10 @@
 __pychache__/
 *.pyo
 *.pyc
+*.pyd
 .venv/
 .env
+venv/
 
 # dbt
 dbt_packages/
@@ -16,3 +18,9 @@ logs/
 # OS-specific files
 .DS_Store
 Thumbs.db
+
+# Ignore Python virtual environments created by pyenv-virtualenv
+.python-version
+
+# Pseudo-Code for planning
+pseudocode/
