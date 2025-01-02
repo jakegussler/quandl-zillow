@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quandl-zillow"
+version = "0.1.0"
+description = "Data pipeline for Zillow data from Nasdaq Data Link"
+requires-python = ">=3.8"
+dependencies = [
+    "python-dotenv",  
+    "pandas",     
+    "nasdaq-data-link",
+    "sqlalchemy",
+    "psycopg2-binary",
+    "dbt-postgres",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Development and testing dependencies
+    "pytest",
+    "black",
+    "plotly",
+    "ipython",
+    "jupyter",
+    "matplotlib",
+    "requests",
+]
+
+[tool.pytest]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+include = '\.pyx?$'
