@@ -2,11 +2,11 @@ import requests
 from dotenv import load_dotenv
 import os
 import pandas as pd
-from logger_config import setup_logging
 from sqlalchemy import create_engine
 import datetime
 import time
 import gc
+from logger_config import setup_logging
 from database import get_engine
 from config import DB_CONFIG, API_CONFIG
 
@@ -40,7 +40,7 @@ def paginated_getter(url):
 
                 request_end_time = datetime.datetime.now()
 
-                df = process_response(json_response)
+                df = process_json_response_as_df(json_response)
                 if df is None:
                     logger.error(f"Failed to process data chunk {page_number}")
                     continue
@@ -110,7 +110,7 @@ def get_response(url, url_parameters,  request_session, max_retries=10, retry_de
                 print("Max retries reached. Returning None")
                 return None
 
-def process_response(json_response, max_retries=3):
+def process_json_response_as_df(json_response, max_retries=3):
     
     for attempt in range(max_retries):
         try:
