@@ -21,6 +21,9 @@ timestamps = {
 
 def get_nasdaq_data_zip(database_code, dataset_code, zip_filepath, max_retries=10, retry_delay=5):
 
+    """
+    Get the data from the NASDAQ Data Link API as a ZIP file
+    """
 
     logger.info(f"Downloading {database_code}_{dataset_code}.zip...")
 
@@ -51,7 +54,7 @@ def get_nasdaq_data_zip(database_code, dataset_code, zip_filepath, max_retries=1
                 logger.warning("Max retries reached. Returning None")
                 raise
 
-def download_zillow_tables():
+def download_zillow_tables_as_zip():
     
     """
     Download the Zillow tables from the NASDAQ Data Link API
@@ -72,7 +75,7 @@ def main() -> None:
 
     
     #Download the zillow tables
-    download_zillow_tables()
+    download_zillow_tables_as_zip()
 
 if __name__ == "__main__":
     main()
