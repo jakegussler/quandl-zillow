@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 import datetime
 import time
 from config import API_CONFIG
-from logger_config import setup_logging
+from utils.logger_utils import setup_logging
 
 
 #Load the environment variables

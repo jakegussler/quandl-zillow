@@ -1,5 +1,5 @@
 import zipfile
-from logger_config import setup_logging
+from src.utils.logger_utils import setup_logging
 import os
 
 logger = setup_logging()
