@@ -1,11 +1,9 @@
 import requests
 from dotenv import load_dotenv
-import os
 import pandas as pd
 from sqlalchemy import create_engine
 import datetime
 import time
-import gc
 from src.utils.logger_utils import setup_logging
 from src.utils.db_utils import get_engine
 from config import DB_CONFIG, API_CONFIG
