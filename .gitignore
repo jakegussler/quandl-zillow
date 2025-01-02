@@ -19,8 +19,15 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Ignore Python virtual environments created by pyenv-virtualenv
+# Python virtual environments created by pyenv-virtualenv
 .python-version
 
 # Pseudo-Code for planning
 pseudocode/
+
+# pyproject artifacts
+*.egg-info/
+
+# Data
+*.csv
+*.zip
