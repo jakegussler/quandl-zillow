@@ -19,7 +19,7 @@ timestamps = {
     "ingest_end_time": None
 }
 
-def get_nasdaq_data_zip(database_code, dataset_code, zip_filepath, max_retries=10, retry_delay=5):
+def get_nasdaq_data_zip(database_code, dataset_code, zip_filepath, max_retries=10, retry_delay=5) -> None:
 
     """
     Get the data from the NASDAQ Data Link API as a ZIP file
@@ -54,16 +54,11 @@ def get_nasdaq_data_zip(database_code, dataset_code, zip_filepath, max_retries=1
                 logger.warning("Max retries reached. Returning None")
                 raise
 
-def download_zillow_tables_as_zip():
+def download_nasdaq_database_zips(database_code: str, dataset_codes: list, zip_filepath: str) -> None:
     
     """
     Download the Zillow tables from the NASDAQ Data Link API
     """
-
-    zip_filepath = "/Users/jakegussler/Projects/quandl-zillow/data/raw"
-
-    database_code = "ZILLOW"
-    dataset_codes = ['DATA', 'INDICATORS', 'REGIONS']
 
     #Iterate through the tables
     for dataset_code in dataset_codes:
@@ -73,9 +68,13 @@ def download_zillow_tables_as_zip():
 
 def main() -> None:
 
-    
+    ##Set the parameters for Zillow downloading, change to generic later and move Zillow info to zillow ETL script
+    zip_filepath = "/Users/jakegussler/Projects/quandl-zillow/data/raw"
+    database_code = "ZILLOW"
+    dataset_codes = ['DATA', 'INDICATORS', 'REGIONS']
+
     #Download the zillow tables
-    download_zillow_tables_as_zip()
+    download_nasdaq_database_zips(database_code, dataset_codes, zip_filepath)
 
 if __name__ == "__main__":
     main()
